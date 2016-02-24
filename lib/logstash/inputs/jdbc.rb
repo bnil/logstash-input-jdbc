@@ -142,6 +142,8 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
   # exactly once.
   config :schedule, :validate => :string
 
+  config :every, :validate => :string
+
   # Path to file with last run time
   config :last_run_metadata_path, :validate => :string, :default => "#{ENV['HOME']}/.logstash_jdbc_last_run"
 
@@ -188,11 +190,18 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
   end # def register
 
   def run(queue)
-    if @schedule
+    if @schedule || @every
       @scheduler = Rufus::Scheduler.new(:max_work_threads => 1)
-      @scheduler.cron @schedule do
-        execute_query(queue)
-        update_state_file
+      if @schedule
+        @scheduler.cron @schedule do
+          execute_query(queue)
+          update_state_file
+        end
+      else
+        @scheduler.every @every do
+          execute_query(queue)
+          update_state_file
+        end
       end
 
       @scheduler.join
